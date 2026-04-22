@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JobPost Capture</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <h1>JobPost Capture</h1>
+        <button id="captureButton" class="button primary" type="button">Capture Job Post</button>
+      </header>
+
+      <section id="message" class="message" aria-live="polite"></section>
+
+      <form id="jobForm" class="form">
+        <label>
+          LinkedIn Job ID
+          <input id="linkedinJobId" name="linkedin_job_id" type="text" readonly>
+        </label>
+
+        <label>
+          About the Job
+          <textarea id="aboutJob" name="about_job" class="raw-text" rows="10"></textarea>
+        </label>
+
+        <label>
+          About the Company
+          <textarea id="aboutCompany" name="about_company" class="raw-text" rows="7"></textarea>
+        </label>
+
+        <label>
+          Company Industry
+          <input id="companyIndustry" name="company_industry" type="text" autocomplete="off">
+        </label>
+
+        <label>
+          Company Employees
+          <input id="companyEmployees" name="company_employees" type="text" autocomplete="off">
+        </label>
+
+        <fieldset class="applied-field">
+          <legend>Applied</legend>
+          <label class="radio-option">
+            <input id="appliedNo" name="applied" type="radio" value="No" checked>
+            No
+          </label>
+          <label class="radio-option">
+            <input id="appliedYes" name="applied" type="radio" value="Yes">
+            Yes
+          </label>
+        </fieldset>
+
+        <div class="actions">
+          <button id="saveButton" class="button success" type="submit">Save</button>
+          <button id="viewButton" class="button" type="button">View Saved Jobs</button>
+          <button id="exportButton" class="button" type="button">Export CSV</button>
+          <button id="clearButton" class="button danger" type="button">Clear All</button>
+        </div>
+
+        <div id="duplicateMessage" class="duplicate-message" aria-live="polite"></div>
+      </form>
+
+      <section class="saved-section">
+        <div class="saved-header">
+          <h2>Saved Jobs</h2>
+          <span id="savedCount" class="count">0</span>
+        </div>
+        <div id="savedJobsList" class="saved-list"></div>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

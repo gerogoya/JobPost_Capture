@@ -1,0 +1,295 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  color: #1f2933;
+  background: #f7f9fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 420px;
+  margin: 0;
+  background: #f7f9fb;
+}
+
+.app {
+  padding: 14px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  color: #12263a;
+}
+
+h1 {
+  font-size: 20px;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+.message {
+  display: none;
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+
+.message.visible {
+  display: block;
+}
+
+.message.info {
+  background: #e8f1fb;
+  color: #17456d;
+}
+
+.message.error {
+  background: #fdecea;
+  color: #8a1f11;
+}
+
+.message.success {
+  background: #e9f7ef;
+  color: #1f6b3a;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 700;
+  color: #35495e;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #c9d4df;
+  border-radius: 6px;
+  padding: 8px;
+  font: inherit;
+  color: #1f2933;
+  background: #ffffff;
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+input[type="radio"] {
+  width: auto;
+}
+
+.raw-text {
+  min-height: 160px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.applied-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #c9d4df;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.applied-field legend {
+  padding: 0 4px;
+  font-weight: 700;
+  color: #35495e;
+}
+
+.radio-option {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.duplicate-message {
+  display: none;
+  padding: 8px 10px;
+  border: 1px solid #e0a6a0;
+  border-radius: 6px;
+  color: #8a1f11;
+  background: #fdecea;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.duplicate-message.visible {
+  display: block;
+}
+
+.button {
+  border: 1px solid #aebdcc;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 700;
+  color: #1f2933;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #edf2f7;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button.primary {
+  border-color: #1f6feb;
+  color: #ffffff;
+  background: #1f6feb;
+}
+
+.button.primary:hover {
+  background: #195cc5;
+}
+
+.button.success {
+  border-color: #218838;
+  color: #ffffff;
+  background: #218838;
+}
+
+.button.success:hover {
+  background: #1b7430;
+}
+
+.button.danger {
+  border-color: #c0392b;
+  color: #ffffff;
+  background: #c0392b;
+}
+
+.button.danger:hover {
+  background: #a93226;
+}
+
+.saved-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d7e0ea;
+}
+
+.saved-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #536b82;
+  font-weight: 700;
+}
+
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.saved-job {
+  padding: 10px;
+  border: 1px solid #d7e0ea;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.saved-job-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: #12263a;
+  overflow-wrap: anywhere;
+}
+
+.saved-job-meta {
+  margin: 0 0 8px;
+  color: #536b82;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.saved-job-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.small-button {
+  border: 1px solid #aebdcc;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1f2933;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.small-button:hover {
+  background: #edf2f7;
+}
+
+.empty-state {
+  color: #536b82;
+  font-size: 13px;
+}
