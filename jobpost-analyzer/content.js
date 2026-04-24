@@ -40,6 +40,73 @@ function firstAvailableText(getters) {
   return "";
 }
 
+function getCompanyInfoScopes() {
+  const selectors = [
+    'div[componentkey^="JobDetails_AboutTheCompany"]',
+    "div.jobs-company__box"
+  ];
+  const scopes = selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
+
+  return Array.from(new Set(scopes));
+}
+
+function getTextLinesFromNode(node) {
+  return getTextFromNode(node)
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function isCompanyInfoLabel(line) {
+  return /^(about the company|company size|employees|founded|headquarters|industry|specialties|website)$/i.test(line);
+}
+
+function getScopedCompanyInfoValue(labelPattern, valuePattern) {
+  for (const scope of getCompanyInfoScopes()) {
+    const lines = getTextLinesFromNode(scope);
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const sameLineValue = line.replace(labelPattern, "").trim();
+
+      if (sameLineValue !== line && sameLineValue && (!valuePattern || valuePattern.test(sameLineValue))) {
+        return sameLineValue;
+      }
+
+      if (!labelPattern.test(line)) continue;
+
+      for (let nextIndex = index + 1; nextIndex < lines.length; nextIndex += 1) {
+        const candidate = lines[nextIndex];
+        if (isCompanyInfoLabel(candidate)) break;
+        if (!valuePattern || valuePattern.test(candidate)) return candidate;
+      }
+    }
+  }
+
+  return "";
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function countCapturedFields(record) {
+  return [
+    record.linkedin_job_id,
+    record.job_title,
+    record.about_job,
+    record.about_company,
+    record.company_industry,
+    record.company_employees
+  ].filter(Boolean).length;
+}
+
+function hasCoreJobFields(record) {
+  return Boolean(record.linkedin_job_id && record.job_title && record.about_job);
+}
+
 function getLinkedInJobIdFromUrl(sourceUrl) {
   try {
     const url = new URL(sourceUrl);
@@ -82,6 +149,14 @@ function getCompanyIndustryFromInlineInfoContainer() {
     .find((line) => !/employees|on linkedin/i.test(line)) || "";
 }
 
+function getCompanyIndustryFromCompanyInfoScope() {
+  return getScopedCompanyInfoValue(/^industry:?\s*/i);
+}
+
+function getCompanyEmployeesFromCompanyInfoScope() {
+  return getScopedCompanyInfoValue(/^(company size|employees):?\s*/i, /employees/i);
+}
+
 function captureJobPostFromPage() {
   const companyDescriptionSelector = 'p[class*="jobs-company__company-description"]';
   const sourceUrl = window.location.href;
@@ -105,11 +180,13 @@ function captureJobPostFromPage() {
       () => getTextFromSelector(companyDescriptionSelector)
     ]),
     company_industry: firstAvailableText([
+      () => getCompanyIndustryFromCompanyInfoScope(),
       () => getTextFromXPath('//*[@id="workspace"]/div/div/div[1]/div/div/div/div[3]/div[8]/div/div/div/div/div[3]/div[2]/div[1]'),
       () => getCompanyIndustryFromInlineInfoContainer(),
       () => getTextFromSelector(companyDescriptionSelector)
     ]),
     company_employees: firstAvailableText([
+      () => getCompanyEmployeesFromCompanyInfoScope(),
       () => getTextFromXPath('//*[@id="workspace"]/div/div/div[1]/div/div/div/div[3]/div[8]/div/div/div/div/div[3]/div[2]/div[3]/p'),
       () => getTextFromFirstSelector("span.jobs-company__inline-information")
     ]),
@@ -118,4 +195,29 @@ function captureJobPostFromPage() {
   };
 }
 
-captureJobPostFromPage();
+async function captureJobPostWhenReady() {
+  const maxAttempts = 12;
+  const retryDelayMs = 300;
+  let bestRecord = captureJobPostFromPage();
+  let bestScore = countCapturedFields(bestRecord);
+
+  for (let attempt = 1; attempt < maxAttempts; attempt += 1) {
+    if (document.readyState === "complete" && hasCoreJobFields(bestRecord) && bestScore >= 5) {
+      break;
+    }
+
+    await delay(retryDelayMs);
+
+    const nextRecord = captureJobPostFromPage();
+    const nextScore = countCapturedFields(nextRecord);
+
+    if (nextScore >= bestScore) {
+      bestRecord = nextRecord;
+      bestScore = nextScore;
+    }
+  }
+
+  return bestRecord;
+}
+
+captureJobPostWhenReady();
