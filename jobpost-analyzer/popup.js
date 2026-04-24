@@ -5,6 +5,7 @@ const captureButton = document.getElementById("captureButton");
 const saveButton = document.getElementById("saveButton");
 const viewButton = document.getElementById("viewButton");
 const exportButton = document.getElementById("exportButton");
+const exportJsonButton = document.getElementById("exportJsonButton");
 const clearButton = document.getElementById("clearButton");
 const savedJobsList = document.getElementById("savedJobsList");
 const savedCount = document.getElementById("savedCount");
@@ -30,6 +31,7 @@ captureButton.addEventListener("click", captureCurrentTab);
 form.addEventListener("submit", saveCurrentRecord);
 viewButton.addEventListener("click", renderSavedJobs);
 exportButton.addEventListener("click", exportSavedJobs);
+exportJsonButton.addEventListener("click", exportSavedJobsAsJson);
 clearButton.addEventListener("click", clearAllSavedJobs);
 
 function createRecordId() {
@@ -84,6 +86,7 @@ function setBusy(isBusy) {
   saveButton.disabled = isBusy;
   viewButton.disabled = isBusy;
   exportButton.disabled = isBusy;
+  exportJsonButton.disabled = isBusy;
   clearButton.disabled = isBusy;
 }
 
@@ -318,6 +321,24 @@ async function clearAllSavedJobs() {
 }
 
 async function exportSavedJobs() {
+  await downloadSavedJobs({
+    extension: "csv",
+    mimeType: "text/csv;charset=utf-8",
+    serialize: exportJobsToCsv,
+    successMessage: "CSV export started."
+  });
+}
+
+async function exportSavedJobsAsJson() {
+  await downloadSavedJobs({
+    extension: "json",
+    mimeType: "application/json;charset=utf-8",
+    serialize: exportJobsToJson,
+    successMessage: "JSON export started."
+  });
+}
+
+async function downloadSavedJobs({ extension, mimeType, serialize, successMessage }) {
   try {
     const jobs = await getSavedJobs();
 
@@ -326,19 +347,19 @@ async function exportSavedJobs() {
       return;
     }
 
-    const csv = exportJobsToCsv(jobs);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const content = serialize(jobs);
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     const date = new Date().toISOString().slice(0, 10);
 
     anchor.href = url;
-    anchor.download = `jobpost-capture-${date}.csv`;
+    anchor.download = `jobpost-capture-${date}.${extension}`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
-    showMessage("CSV export started.", "success");
+    showMessage(successMessage, "success");
   } catch (error) {
     showMessage(`Export failed: ${friendlyError(error)}`, "error");
   }
