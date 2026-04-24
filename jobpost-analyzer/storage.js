@@ -87,6 +87,17 @@ function exportJobsToCsv(jobs) {
   return [header, ...rows].join("\r\n");
 }
 
+function exportJobsToJson(jobs) {
+  const normalizedJobs = jobs.map((job) => (
+    JOB_FIELDS.reduce((record, field) => {
+      record[field] = field === "applied" ? normalizeAppliedValue(job[field]) : job[field] ?? "";
+      return record;
+    }, {})
+  ));
+
+  return JSON.stringify(normalizedJobs, null, 2);
+}
+
 function normalizeAppliedValue(value) {
   return value === true || value === "Yes" ? "Yes" : "No";
 }

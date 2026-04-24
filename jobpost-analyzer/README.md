@@ -20,7 +20,7 @@ This is not a scraper, crawler, bot, or auto-apply tool. It captures only the cu
 - Local persistence with `chrome.storage.local`
 - Saved job list with edit and delete actions
 - Clear all saved records after confirmation
-- CSV export with all fields in the data model
+- CSV and JSON export with all fields in the data model
 - No AI API calls
 - No API keys
 - No automated browsing, clicking, applying, or bulk scraping
@@ -55,7 +55,7 @@ This is not a scraper, crawler, bot, or auto-apply tool. It captures only the cu
 4. Review or edit the fields.
 5. Click Save.
 6. Click View Saved Jobs to review stored records.
-7. Click Export CSV when needed.
+7. Click Export CSV or Export JSON when needed.
 
 ## Limitations
 
