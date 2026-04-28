@@ -1,1 +1,6 @@
 view-source*.html
+
+*.zip
+*.mp4
+screenshots/
+jobpost-capture-privacy/

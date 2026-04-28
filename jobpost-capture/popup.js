@@ -1,14 +1,19 @@
 const form = document.getElementById("jobForm");
+const startScreen = document.getElementById("startScreen");
+const captureScreen = document.getElementById("captureScreen");
+const startButton = document.getElementById("startButton");
 const messageEl = document.getElementById("message");
 const duplicateMessageEl = document.getElementById("duplicateMessage");
 const captureButton = document.getElementById("captureButton");
 const saveButton = document.getElementById("saveButton");
-const viewButton = document.getElementById("viewButton");
 const exportButton = document.getElementById("exportButton");
 const exportJsonButton = document.getElementById("exportJsonButton");
 const clearButton = document.getElementById("clearButton");
 const savedJobsList = document.getElementById("savedJobsList");
 const savedCount = document.getElementById("savedCount");
+const LINKEDIN_RECOMMENDED_JOBS_URL = "https://www.linkedin.com/jobs/collections/recommended/";
+const RECOMMENDED_READY_POLL_MS = 500;
+const RECOMMENDED_READY_TIMEOUT_MS = 20000;
 
 const fields = {
   linkedinJobId: document.getElementById("linkedinJobId"),
@@ -21,15 +26,19 @@ const fields = {
 };
 
 let currentRecord = createEmptyRecord();
+let isBusy = false;
+let isWaitingForInitialRecommendedJob = false;
+let shouldCaptureFirstRecommendedJob = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
   resetForm();
+  await initializeScreen();
   await renderSavedJobs();
 });
 
+startButton.addEventListener("click", openJobListingsAndStart);
 captureButton.addEventListener("click", captureCurrentTab);
 form.addEventListener("submit", saveCurrentRecord);
-viewButton.addEventListener("click", renderSavedJobs);
 exportButton.addEventListener("click", exportSavedJobs);
 exportJsonButton.addEventListener("click", exportSavedJobsAsJson);
 clearButton.addEventListener("click", clearAllSavedJobs);
@@ -61,6 +70,134 @@ function createEmptyRecord() {
   };
 }
 
+async function initializeScreen() {
+  const tab = await getActiveTab();
+  const activeUrl = tab && tab.id ? await getTabUrl(tab) : "";
+  const isSupportedPage = isSupportedLinkedInJobsUrl(activeUrl)
+    || Boolean(tab && tab.id && await getLinkedInJobsPageStatus(tab.id));
+  showCaptureScreen(isSupportedPage);
+}
+
+function showCaptureScreen(shouldShowCaptureScreen) {
+  startScreen.classList.toggle("hidden", shouldShowCaptureScreen);
+  captureScreen.classList.toggle("hidden", !shouldShowCaptureScreen);
+}
+
+async function openJobListingsAndStart() {
+  startButton.disabled = true;
+
+  try {
+    const tab = await getActiveTab();
+    if (tab && tab.id) {
+      await chrome.tabs.update(tab.id, { url: LINKEDIN_RECOMMENDED_JOBS_URL });
+    }
+
+    showCaptureScreen(true);
+    isWaitingForInitialRecommendedJob = true;
+    await waitForInitialRecommendedJob(tab && tab.id ? tab.id : null);
+  } catch (error) {
+    showCaptureScreen(false);
+    startButton.disabled = false;
+    showMessage(`Could not open LinkedIn jobs: ${friendlyError(error)}`, "error");
+  }
+}
+
+async function waitForInitialRecommendedJob(tabId) {
+  setCaptureAvailability(false);
+  showMessage("Loading LinkedIn recommended jobs...", "info");
+
+  try {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < RECOMMENDED_READY_TIMEOUT_MS) {
+      const tab = await getActiveTab();
+
+      if (tab && tab.id && (!tabId || tab.id === tabId)) {
+        const activeUrl = await getTabUrl(tab);
+        if (!isRecommendedLinkedInJobsUrl(activeUrl)) {
+          await delay(RECOMMENDED_READY_POLL_MS);
+          continue;
+        }
+
+        const currentJobStatus = await getVisibleCurrentRecommendedJobStatus(tab.id);
+        if (currentJobStatus.isReady) {
+          isWaitingForInitialRecommendedJob = false;
+          shouldCaptureFirstRecommendedJob = false;
+          setCaptureAvailability(true);
+          clearMessage();
+          return;
+        }
+
+        const isFirstRecommendedJobReady = !currentJobStatus.currentJobId
+          && await hasFirstRecommendedJobCard(tab.id);
+        if (isFirstRecommendedJobReady) {
+          isWaitingForInitialRecommendedJob = false;
+          shouldCaptureFirstRecommendedJob = true;
+          setCaptureAvailability(true);
+          clearMessage();
+          return;
+        }
+      }
+
+      await delay(RECOMMENDED_READY_POLL_MS);
+    }
+
+    showMessage("LinkedIn is still loading the first recommended job. Try Capture again in a moment.", "info");
+  } catch (error) {
+    showMessage(`Could not confirm LinkedIn job list readiness: ${friendlyError(error)}`, "error");
+  } finally {
+    isWaitingForInitialRecommendedJob = false;
+    setCaptureAvailability(true);
+  }
+}
+
+async function getActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab || null;
+}
+
+async function getTabUrl(tab) {
+  if (!tab || !tab.id) return "";
+  if (tab.url && isSupportedLinkedInJobsUrl(tab.url)) return tab.url;
+
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => window.location.href
+    });
+
+    if (typeof result === "string" && result) return result;
+  } catch {
+    // Fall back to Chrome's tab URL when script injection is not available yet.
+  }
+
+  return tab.url || "";
+}
+
+async function getLinkedInJobsPageStatus(tabId) {
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const isLinkedInJobsPage = window.location.origin === "https://www.linkedin.com"
+          && (
+            window.location.pathname.startsWith("/jobs/collections/recommended/")
+            || window.location.pathname.startsWith("/jobs/view/")
+          );
+
+        return {
+          isLinkedInJobsPage,
+          href: window.location.href
+        };
+      }
+    });
+
+    return result && result.isLinkedInJobsPage ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 function showMessage(text, type = "info") {
   messageEl.textContent = text;
   messageEl.className = `message visible ${type}`;
@@ -81,13 +218,147 @@ function clearDuplicateMessage() {
   duplicateMessageEl.className = "duplicate-message";
 }
 
-function setBusy(isBusy) {
-  captureButton.disabled = isBusy;
+function setBusy(nextIsBusy) {
+  isBusy = nextIsBusy;
+  captureButton.disabled = isBusy || isWaitingForInitialRecommendedJob;
   saveButton.disabled = isBusy;
-  viewButton.disabled = isBusy;
   exportButton.disabled = isBusy;
   exportJsonButton.disabled = isBusy;
   clearButton.disabled = isBusy;
+}
+
+function setCaptureAvailability(isAvailable) {
+  captureButton.disabled = !isAvailable || isBusy;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+async function getVisibleCurrentRecommendedJobStatus(tabId) {
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        function getLinkedInJobIdFromUrl(sourceUrl) {
+          try {
+            const url = new URL(sourceUrl);
+            const currentJobId = url.searchParams.get("currentJobId");
+            return currentJobId && /^\d+$/.test(currentJobId) ? currentJobId : "";
+          } catch {
+            return "";
+          }
+        }
+
+        function getRecommendedJobsList() {
+          const sentinel = document.querySelector("div[data-results-list-top-scroll-sentinel]");
+          if (!sentinel) return null;
+
+          let sibling = sentinel.nextElementSibling;
+          while (sibling) {
+            if (sibling.matches("ul")) return sibling;
+            sibling = sibling.nextElementSibling;
+          }
+
+          return sentinel.parentElement ? sentinel.parentElement.querySelector("ul") : null;
+        }
+
+        function isElementInViewport(element) {
+          if (!element) return false;
+
+          const rect = element.getBoundingClientRect();
+          const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+          return rect.width > 0
+            && rect.height > 0
+            && rect.bottom > 0
+            && rect.right > 0
+            && rect.top < viewportHeight
+            && rect.left < viewportWidth;
+        }
+
+        function findCurrentJobListItem(currentJobId) {
+          const selectors = [
+            `li[data-occludable-job-id="${currentJobId}"]`,
+            `[data-job-id="${currentJobId}"]`,
+            `a[href*="currentJobId=${currentJobId}"]`,
+            `a[href*="/jobs/view/${currentJobId}"]`
+          ];
+          const list = getRecommendedJobsList();
+
+          for (const selector of selectors) {
+            const match = list ? list.querySelector(selector) : document.querySelector(selector);
+            const listItem = match && match.closest ? match.closest("li[data-occludable-job-id]") : null;
+            if (listItem) return listItem;
+            if (match && match.matches && match.matches("li[data-occludable-job-id]")) return match;
+          }
+
+          return null;
+        }
+
+        function getVisibleJobDetailsPanel() {
+          const selectors = [
+            ".jobs-search__job-details",
+            ".jobs-details",
+            ".job-view-layout",
+            ".job-details-jobs-unified-top-card",
+            "[data-job-id]"
+          ];
+
+          return selectors
+            .map((selector) => document.querySelector(selector))
+            .find((element) => element && isElementInViewport(element)) || null;
+        }
+
+        const currentJobId = getLinkedInJobIdFromUrl(window.location.href);
+        if (!currentJobId) {
+          return { currentJobId: "", isReady: false };
+        }
+
+        const currentJob = findCurrentJobListItem(currentJobId);
+        const currentJobCardIsVisible = Boolean(
+          currentJob
+            && isElementInViewport(currentJob)
+            && currentJob.querySelector("[data-job-id], a[href*='/jobs/view/']")
+        );
+        const visibleDetailsPanel = getVisibleJobDetailsPanel();
+
+        return {
+          currentJobId,
+          isReady: currentJobCardIsVisible || Boolean(visibleDetailsPanel)
+        };
+      }
+    });
+
+    return result || { currentJobId: "", isReady: false };
+  } catch {
+    return { currentJobId: "", isReady: false };
+  }
+}
+
+async function hasFirstRecommendedJobCard(tabId) {
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const sentinel = document.querySelector("div[data-results-list-top-scroll-sentinel]");
+        const list = sentinel
+          ? sentinel.parentElement && sentinel.parentElement.querySelector("ul")
+          : document.querySelector("ul");
+        const firstJob = list
+          ? list.querySelector('li[data-occludable-job-id]:not(.jobs-search-results__job-card-search--generic-occludable-area)')
+          : document.querySelector('li[data-occludable-job-id]:not(.jobs-search-results__job-card-search--generic-occludable-area)');
+        return Boolean(firstJob && firstJob.querySelector("[data-job-id], a[href*='/jobs/view/']"));
+      }
+    });
+
+    return Boolean(result);
+  } catch {
+    return false;
+  }
 }
 
 async function captureCurrentTab() {
@@ -102,14 +373,36 @@ async function captureCurrentTab() {
       throw new Error("No active browser tab was found.");
     }
 
+    const activeUrl = await getTabUrl(tab);
+    const pageStatus = isSupportedLinkedInJobsUrl(activeUrl)
+      ? null
+      : await getLinkedInJobsPageStatus(tab.id);
+
+    if (!isSupportedLinkedInJobsUrl(activeUrl) && !pageStatus) {
+      throw new Error("Open a LinkedIn job post or your recommended LinkedIn jobs page before capturing.");
+    }
+
+    const captureUrl = pageStatus && pageStatus.href ? pageStatus.href : activeUrl;
+
+    if (shouldCaptureFirstRecommendedJob && isRecommendedLinkedInJobsUrl(captureUrl)) {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          window.__JOBPOST_CAPTURE_FIRST_RECOMMENDED__ = true;
+        }
+      });
+    }
+
     const [{ result }] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ["content.js"]
     });
 
+    shouldCaptureFirstRecommendedJob = false;
+
     const now = new Date().toISOString();
     const pageTitle = result && result.page_title ? result.page_title : tab.title || "";
-    const sourceUrl = result && result.source_url ? result.source_url : tab.url || "";
+    const sourceUrl = result && result.source_url ? result.source_url : captureUrl || "";
     const linkedInJobId = result && result.linkedin_job_id ? result.linkedin_job_id.trim() : "";
     const jobTitle = result && result.job_title ? result.job_title.trim() : "";
     const aboutJob = result && result.about_job ? result.about_job.trim() : "";
@@ -136,7 +429,7 @@ async function captureCurrentTab() {
     if (duplicate) {
       currentRecord = { ...duplicate };
       populateForm(currentRecord);
-      showDuplicateMessage("This LinkedIn job post is already saved. Existing record loaded for editing.");
+      showDuplicateMessage("This LinkedIn job post is already saved.");
       await renderSavedJobs();
       return;
     }
@@ -147,6 +440,29 @@ async function captureCurrentTab() {
     showMessage(`Capture failed: ${friendlyError(error)}`, "error");
   } finally {
     setBusy(false);
+  }
+}
+
+function isSupportedLinkedInJobsUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.origin === "https://www.linkedin.com"
+      && (
+        url.pathname.startsWith("/jobs/collections/recommended/")
+        || url.pathname.startsWith("/jobs/view/")
+      );
+  } catch {
+    return false;
+  }
+}
+
+function isRecommendedLinkedInJobsUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.origin === "https://www.linkedin.com"
+      && url.pathname.startsWith("/jobs/collections/recommended/");
+  } catch {
+    return false;
   }
 }
 
@@ -164,7 +480,7 @@ async function saveCurrentRecord(event) {
     if (duplicate && duplicate.record_id !== currentRecord.record_id) {
       currentRecord = { ...duplicate };
       populateForm(currentRecord);
-      showDuplicateMessage("This LinkedIn job post is already saved. Existing record loaded for editing.");
+      showDuplicateMessage("This LinkedIn job post is already saved.");
       await renderSavedJobs();
       return;
     }
@@ -265,17 +581,6 @@ function createSavedJobElement(job) {
   const actions = document.createElement("div");
   actions.className = "saved-job-actions";
 
-  const editButton = document.createElement("button");
-  editButton.className = "small-button";
-  editButton.type = "button";
-  editButton.textContent = "Edit";
-  editButton.addEventListener("click", () => {
-    clearDuplicateMessage();
-    currentRecord = { ...job };
-    populateForm(currentRecord);
-    showMessage("Saved job loaded for editing.", "info");
-  });
-
   const deleteButton = document.createElement("button");
   deleteButton.className = "small-button";
   deleteButton.type = "button";
@@ -284,7 +589,7 @@ function createSavedJobElement(job) {
     await deleteSavedJob(job.record_id);
   });
 
-  actions.append(editButton, deleteButton);
+  actions.append(deleteButton);
   item.append(title, meta, actions);
 
   return item;

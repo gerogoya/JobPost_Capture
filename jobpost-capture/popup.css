@@ -20,6 +20,31 @@ body {
   padding: 14px;
 }
 
+.hidden {
+  display: none !important;
+}
+
+.start-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.start-screen h1 {
+  line-height: 1.2;
+}
+
+.start-screen p {
+  margin: 0;
+  color: #35495e;
+  line-height: 1.45;
+}
+
+.start-button {
+  width: 100%;
+  margin-top: 4px;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -75,12 +100,25 @@ h2 {
   gap: 10px;
 }
 
+.top-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 label {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-weight: 700;
   color: #35495e;
+}
+
+.inline-field {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  align-items: center;
+  gap: 8px;
 }
 
 input,
@@ -105,7 +143,7 @@ input[type="radio"] {
 }
 
 .raw-text {
-  min-height: 160px;
+  min-height: 80px;
   font-family: Consolas, "Courier New", monospace;
   font-size: 12px;
 }
@@ -120,7 +158,6 @@ input[type="radio"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-top: 2px;
 }
 
 .applied-field {

@@ -107,6 +107,98 @@ function hasCoreJobFields(record) {
   return Boolean(record.linkedin_job_id && record.job_title && record.about_job);
 }
 
+function isRecommendedJobsPage() {
+  return window.location.origin === "https://www.linkedin.com"
+    && window.location.pathname.startsWith("/jobs/collections/recommended/");
+}
+
+function getRecommendedJobsList() {
+  const sentinel = document.querySelector("div[data-results-list-top-scroll-sentinel]");
+  if (!sentinel) return null;
+
+  let sibling = sentinel.nextElementSibling;
+  while (sibling) {
+    if (sibling.matches("ul")) return sibling;
+    sibling = sibling.nextElementSibling;
+  }
+
+  return sentinel.parentElement ? sentinel.parentElement.querySelector("ul") : null;
+}
+
+function getFirstRecommendedJobListItem() {
+  const list = getRecommendedJobsList();
+  const selector = 'li[data-occludable-job-id]:not(.jobs-search-results__job-card-search--generic-occludable-area)';
+  const firstJob = list ? list.querySelector(selector) : document.querySelector(selector);
+
+  if (!firstJob || !firstJob.querySelector("[data-job-id], a[href*='/jobs/view/']")) {
+    return null;
+  }
+
+  return firstJob;
+}
+
+function getRecommendedJobIdFromListItem(listItem) {
+  if (!listItem) return "";
+
+  const jobId = listItem.getAttribute("data-occludable-job-id");
+  if (jobId && /^\d+$/.test(jobId)) return jobId;
+
+  const jobContainer = listItem.querySelector("[data-job-id]");
+  return jobContainer ? jobContainer.getAttribute("data-job-id") || "" : "";
+}
+
+function getRecommendedJobOpenTarget(listItem) {
+  if (!listItem) return null;
+
+  return listItem.querySelector("[data-job-id]")
+    || listItem.querySelector("a[href*='/jobs/view/']")
+    || listItem;
+}
+
+function clickElement(element) {
+  if (!element) return;
+
+  element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true, view: window }));
+  element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+  element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+  element.click();
+}
+
+async function selectFirstRecommendedJobWhenReady() {
+  const maxAttempts = 40;
+  const retryDelayMs = 250;
+  let firstJob = getFirstRecommendedJobListItem();
+
+  for (let attempt = 0; attempt < maxAttempts && !firstJob; attempt += 1) {
+    await delay(retryDelayMs);
+    firstJob = getFirstRecommendedJobListItem();
+  }
+
+  if (!firstJob) return "";
+
+  const firstJobId = getRecommendedJobIdFromListItem(firstJob);
+  const currentJobId = getLinkedInJobIdFromUrl(window.location.href);
+
+  firstJob.scrollIntoView({ block: "center", inline: "nearest" });
+
+  if (!firstJobId || currentJobId !== firstJobId) {
+    clickElement(getRecommendedJobOpenTarget(firstJob));
+  }
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const record = captureJobPostFromPage();
+    const selectedJobId = getLinkedInJobIdFromUrl(window.location.href) || record.linkedin_job_id;
+
+    if ((!firstJobId || selectedJobId === firstJobId) && hasCoreJobFields(record)) {
+      break;
+    }
+
+    await delay(retryDelayMs);
+  }
+
+  return firstJobId;
+}
+
 function getLinkedInJobIdFromUrl(sourceUrl) {
   try {
     const url = new URL(sourceUrl);
@@ -131,6 +223,15 @@ function getLinkedInJobIdFromPageText() {
   const html = document.documentElement ? document.documentElement.innerHTML : "";
   const match = html.match(/urn:li:jobPosting:(\d+)/);
   return match ? match[1] : "";
+}
+
+function getLinkedInJobIdFromDetailsPanel() {
+  const jobIdElement = document.querySelector("[data-live-test-job-apply-button][data-job-id]")
+    || document.querySelector(".jobs-apply-button[data-job-id]")
+    || document.querySelector(".jobs-s-apply [data-job-id]");
+  const jobId = jobIdElement ? jobIdElement.getAttribute("data-job-id") || "" : "";
+
+  return /^\d+$/.test(jobId) ? jobId : "";
 }
 
 function getCompanyIndustryFromInlineInfoContainer() {
@@ -164,6 +265,7 @@ function captureJobPostFromPage() {
   return {
     linkedin_job_id: firstAvailableText([
       () => getLinkedInJobIdFromUrl(sourceUrl),
+      () => getLinkedInJobIdFromDetailsPanel(),
       () => getLinkedInJobIdFromPageText()
     ]),
     job_title: firstAvailableText([
@@ -198,6 +300,12 @@ function captureJobPostFromPage() {
 async function captureJobPostWhenReady() {
   const maxAttempts = 12;
   const retryDelayMs = 300;
+  const shouldSelectFirstRecommendedJob = Boolean(window.__JOBPOST_CAPTURE_FIRST_RECOMMENDED__);
+  window.__JOBPOST_CAPTURE_FIRST_RECOMMENDED__ = false;
+
+  const firstRecommendedJobId = isRecommendedJobsPage() && shouldSelectFirstRecommendedJob
+    ? await selectFirstRecommendedJobWhenReady()
+    : "";
   let bestRecord = captureJobPostFromPage();
   let bestScore = countCapturedFields(bestRecord);
 
@@ -217,7 +325,10 @@ async function captureJobPostWhenReady() {
     }
   }
 
-  return bestRecord;
+  return {
+    ...bestRecord,
+    linkedin_job_id: bestRecord.linkedin_job_id || firstRecommendedJobId
+  };
 }
 
 captureJobPostWhenReady();

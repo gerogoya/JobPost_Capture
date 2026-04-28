@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JobPost Capture</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="app">
+      <section id="startScreen" class="start-screen">
+        <h1>Ready to capture LinkedIn job posts?</h1>
+        <p>
+          This extension helps you collect important details from LinkedIn job posts in a fast,
+          organized, and reliable way.
+        </p>
+        <p>
+          Start by opening your LinkedIn recommended jobs page. Once you are there, choose a job
+          post and click <strong>Capture</strong> to save its information.
+        </p>
+        <button id="startButton" class="button primary start-button" type="button">
+          Open Job Listings and Start
+        </button>
+      </section>
+
+      <section id="captureScreen" class="capture-screen hidden">
+        <header class="header">
+          <h1>JobPost Capture</h1>
+          <button id="captureButton" class="button primary" type="button">Capture Job Post</button>
+        </header>
+
+        <section id="message" class="message" aria-live="polite"></section>
+
+        <form id="jobForm" class="form">
+          <label class="inline-field">
+            LinkedIn Job ID
+            <input id="linkedinJobId" name="linkedin_job_id" type="text" readonly>
+          </label>
+
+          <div class="top-controls">
+            <fieldset class="applied-field">
+              <legend>Applied</legend>
+              <label class="radio-option">
+                <input id="appliedNo" name="applied" type="radio" value="No" checked>
+                No
+              </label>
+              <label class="radio-option">
+                <input id="appliedYes" name="applied" type="radio" value="Yes">
+                Yes
+              </label>
+            </fieldset>
+
+            <div class="actions">
+              <button id="saveButton" class="button success" type="submit">Save</button>
+              <button id="clearButton" class="button danger" type="button">Clear All</button>
+              <button id="exportButton" class="button" type="button">Export CSV</button>
+              <button id="exportJsonButton" class="button" type="button">Export JSON</button>
+            </div>
+
+            <div id="duplicateMessage" class="duplicate-message" aria-live="polite"></div>
+          </div>
+
+          <label>
+            About the Job
+            <textarea id="aboutJob" name="about_job" class="raw-text" rows="5"></textarea>
+          </label>
+
+          <label>
+            About the Company
+            <textarea id="aboutCompany" name="about_company" class="raw-text" rows="4"></textarea>
+          </label>
+
+          <label>
+            Company Industry
+            <input id="companyIndustry" name="company_industry" type="text" autocomplete="off">
+          </label>
+
+          <label>
+            Company Employees
+            <input id="companyEmployees" name="company_employees" type="text" autocomplete="off">
+          </label>
+        </form>
+
+        <section class="saved-section">
+          <div class="saved-header">
+            <h2>Saved Jobs</h2>
+            <span id="savedCount" class="count">0</span>
+          </div>
+          <div id="savedJobsList" class="saved-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
