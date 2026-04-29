@@ -181,7 +181,8 @@ async function getLinkedInJobsPageStatus(tabId) {
       func: () => {
         const isLinkedInJobsPage = window.location.origin === "https://www.linkedin.com"
           && (
-            window.location.pathname.startsWith("/jobs/collections/recommended/")
+            window.location.pathname.startsWith("/jobs/search-results/")
+            || window.location.pathname.startsWith("/jobs/collections/recommended/")
             || window.location.pathname.startsWith("/jobs/view/")
           );
 
@@ -448,7 +449,8 @@ function isSupportedLinkedInJobsUrl(value) {
     const url = new URL(value);
     return url.origin === "https://www.linkedin.com"
       && (
-        url.pathname.startsWith("/jobs/collections/recommended/")
+        url.pathname.startsWith("/jobs/search-results/")
+        || url.pathname.startsWith("/jobs/collections/recommended/")
         || url.pathname.startsWith("/jobs/view/")
       );
   } catch {
